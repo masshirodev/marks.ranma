@@ -96,13 +96,13 @@ PS1='\[\e]133;D;${_ranma_s}\a\e]133;A\a\]'"$PS1"
 PS0='\e]133;C\a'
 ```
 
-**powerlevel10k** sets `PS1` itself and redraws its prompt, so it draws over the CONFIG.md lines' marks and the pane has none: marks says so. Turn on its own marks in `~/.p10k.zsh` (alongside the CONFIG.md lines is fine):
+**powerlevel10k with its transient prompt sees nothing.** With the CONFIG.md lines alone, a p10k prompt is drawn over its marks every time, so marks finds none in the pane and says so. That is a ranma bug (card c239, "pane:marks() loses marks when the shell redraws its prompt (empty under p10k)"), and this stays true until ranma fixes it. p10k rebuilds `PS1` before every prompt, so the zsh lines above do not help under it. Turn on p10k's own marks in `~/.p10k.zsh` instead (alongside the CONFIG.md lines is fine):
 
 ```zsh
 typeset -g POWERLEVEL9K_TERM_SHELL_INTEGRATION=true
 ```
 
-Prompts, command lines and output then come through, but not exit statuses: p10k sends a command's end before a prompt it then redraws. The list shows `·` for the status and no durations.
+Prompts, command lines and output then come through, but exit statuses do not: p10k sends a command's end before a prompt it then redraws. The list shows `·` for the status, and no durations.
 
 ## Binds and commands
 
