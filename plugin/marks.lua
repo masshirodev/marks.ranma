@@ -195,7 +195,10 @@ end
 -- is a prompt finished on its own line (zsh prints a PS1 holding the marks
 -- twice, which leaves an empty one before each).
 local function read(p)
-  local ms = p:marks()
+  local ok, ms = pcall(function() return p:marks() end)
+  -- A ranma from before pane:marks() (0.2.0 and older) loads the plugin fine.
+  if not ok then error("marks: this ranma (" .. ranma.version .. ") has no pane:marks();"
+    .. " the release after 0.2.0 does", 0) end
   local ran = {}
   for i, m in ipairs(ms) do
     -- A prompt redrawn (a resize, p10k refreshing) loses the D sent before
