@@ -3,10 +3,9 @@
 -- the scrollback.
 --
 -- It reads pane:marks(), so the shell has to mark its prompts and commands
--- with OSC 133: the README's "Shell integration" has zsh, bash and
--- powerlevel10k. A pane with no marks says why in a toast (and on the list's
--- status), its shell sending none or drawing its prompt over them, and
--- nothing else happens.
+-- with OSC 133: the zsh lines under `command_finished` in ranma's CONFIG.md,
+-- or the README's bash lines. A pane whose shell sends none says so in a
+-- toast (and on the list's status), and nothing else happens.
 --
 -- leader ' is a folder (+marks), ' being vim's key for marks:
 --   ' k    the previous prompt, scrolled to the top of the view; then MARKS
@@ -41,12 +40,12 @@
 -- matches. How long a command ran comes from the command_finished hook, kept
 -- for each pane until the configuration reloads, and is shown only where the
 -- exit statuses line up, newest first; a command that finished before a
--- reload shows none. A shell whose marks lose their exit status (p10k's)
--- shows · for it, and no durations.
+-- reload shows none. A shell that does not say how a command ended shows ·
+-- for its status, and no duration.
 -- Options (settings panel, "marks" group): marks.prompt, marks.max,
 -- marks.preview.
 --
--- Needs a ranma with pane:marks(): the first release after 0.2.0.
+-- Needs ranma 0.2.1 or newer, the first with pane:marks().
 -- ranma's plugin API: https://github.com/masshirodev/ranma/blob/main/doc/CONFIG.md ("Pane
 -- handles", "Screens", "Modes", "Hooks").
 
@@ -68,14 +67,8 @@ local ENDS = { "$ ", "% ", "# ", "> ", "❯ ", "➜ ", "» ", "λ " }
 local MAX_ROWS = 50
 local RUNS = 1000
 
--- Why a pane has no marks. Commands seen to finish there (the hook hears
--- the shell's marks as they pass) mean the shell sends them and its prompt
--- is drawn over them: p10k's transient prompt does, with the zsh lines.
+-- Why a pane has no marks.
 local function why_none(p)
-  if p.vars.marks_runs and #p.vars.marks_runs > 0 then
-    return "pane " .. p.id .. "'s prompt is drawn over its marks (p10k does that):"
-      .. " see marks.ranma's README."
-  end
   return "pane " .. p.id .. "'s shell sends no prompt marks: see command_finished in"
     .. " ranma's CONFIG.md."
 end
@@ -142,8 +135,8 @@ local function command_of(p, m)
   if m.cmd then return m.cmd end
   local stop = m.output or m.finished
   if not stop then return "" end
-  -- A B can land past the command line (p10k's transient prompt redraws the
-  -- prompt and not the text after it): then the prompt's line is the start.
+  -- A B past the command line (one that landed on a later prompt) is no
+  -- help: then the prompt's line is the start.
   local first = m.command < stop and m.command or m.prompt
   local last = math.min(math.max(first, stop - 1), first + MAX_ROWS)
   local lines = unwrap(p, p:lines(first, last))
@@ -189,24 +182,22 @@ local function output_lines(p, m)
 end
 
 -- The commands that ran (or run) in the pane, oldest first, and every mark.
--- A command has its output mark (C), or finished with a command line: zsh's
--- PROMPT_SP overwrites the cell the C of a command that printed nothing
--- waits on, so that C is lost. An Enter on an empty line is no command, nor
--- is a prompt finished on its own line (zsh prints a PS1 holding the marks
--- twice, which leaves an empty one before each).
+-- An Enter on an empty line is no command: it printed nothing (since 0.2.1,
+-- output where it finished) and has no command line. Nor is a prompt
+-- finished on its own line.
 local function read(p)
   local ok, ms = pcall(function() return p:marks() end)
   -- A ranma from before pane:marks() (0.2.0 and older) loads the plugin fine.
   if not ok then error("marks: this ranma (" .. ranma.version .. ") has no pane:marks();"
-    .. " the release after 0.2.0 does", 0) end
+    .. " it needs 0.2.1 or newer", 0) end
   local ran = {}
   for i, m in ipairs(ms) do
-    -- A prompt redrawn (a resize, p10k refreshing) loses the D sent before
-    -- it, but the next prompt says the command is over: its status unknown.
+    -- A shell that sends no D (only A, or its D lost) still starts the next
+    -- prompt: the command is over there, its status unknown.
     if not m.finished and ms[i + 1] then m.finished = ms[i + 1].prompt end
-    if m.output or (m.finished and m.finished > m.prompt and command_of(p, m) ~= "") then
-      ran[#ran + 1] = m
-    end
+    local printed = m.output and m.output ~= m.finished
+    local over = m.finished and m.finished > m.prompt
+    if printed or ((m.output or over) and command_of(p, m) ~= "") then ran[#ran + 1] = m end
   end
   return ran, ms
 end

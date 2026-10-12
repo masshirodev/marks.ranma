@@ -16,7 +16,7 @@ Or by hand, as ranma loads any package under `pack/*/start/`:
 git clone https://github.com/masshirodev/marks.ranma ~/.config/ranma/pack/plugins/start/marks.ranma
 ```
 
-Needs: the first ranma release after 0.2.0, which has `pane:marks()`, and a shell that marks its prompts (below).
+Needs: ranma 0.2.1 or newer (the first with `pane:marks()`), and a shell that marks its prompts (below).
 
 ## What it does
 
@@ -26,10 +26,9 @@ copy a command's output without copy mode, and list the commands still in
 the scrollback.
 
 It reads pane:marks(), so the shell has to mark its prompts and commands
-with OSC 133: the README's "Shell integration" has zsh, bash and
-powerlevel10k. A pane with no marks says why in a toast (and on the list's
-status), its shell sending none or drawing its prompt over them, and
-nothing else happens.
+with OSC 133: the zsh lines under `command_finished` in ranma's CONFIG.md,
+or the README's bash lines. A pane whose shell sends none says so in a
+toast (and on the list's status), and nothing else happens.
 
 leader ' is a folder (+marks), ' being vim's key for marks:
   ' k    the previous prompt, scrolled to the top of the view; then MARKS
@@ -64,45 +63,30 @@ and the prompt cut from it: up to the first `$ `, `% `, `# `, `> `, `❯ `,
 matches. How long a command ran comes from the command_finished hook, kept
 for each pane until the configuration reloads, and is shown only where the
 exit statuses line up, newest first; a command that finished before a
-reload shows none. A shell whose marks lose their exit status (p10k's)
-shows · for it, and no durations.
+reload shows none. A shell that does not say how a command ended shows ·
+for its status, and no duration.
 Options (settings panel, "marks" group): marks.prompt, marks.max,
 marks.preview.
 
-Needs a ranma with pane:marks(): the first release after 0.2.0.
+Needs ranma 0.2.1 or newer, the first with pane:marks().
 ranma's plugin API: https://github.com/masshirodev/ranma/blob/main/doc/CONFIG.md ("Pane
 handles", "Screens", "Modes", "Hooks").
 ```
 
 ## Shell integration
 
-ranma learns where prompts, command lines and output are from the OSC 133 marks the shell prints, and keeps each one on the first character printed after it. A shell that later draws over that character takes the mark with it. That happens when the shell redraws its prompt: zsh and bash do on a resize, and powerlevel10k does on every prompt. So the marks belong inside the prompt, which sends them again each time it is drawn.
+marks reads where prompts, command lines and output are from the OSC 133 marks the shell prints. A shell that sends none gets a toast saying so, and nothing else happens.
 
-**zsh.** The lines under `command_finished` in ranma's CONFIG.md work until a prompt is redrawn: that prompt's marks are lost, and the command before it runs on into the next. This sends the end of a command and the start of a prompt from the prompt itself:
+**zsh**: the lines under `command_finished` in ranma's CONFIG.md. They work as they are under powerlevel10k, its transient prompt included.
 
-```zsh
-_ranma_mark_start() { print -n "\e]133;C\a"; }
-preexec_functions+=(_ranma_mark_start)
-PS1=$'%{\e]133;D;%?\a\e]133;A\a%}'$PS1
-```
-
-The `command_finished` and `command_started` hooks work the same with it. A command that prints nothing loses its output mark to zsh's `PROMPT_SP` either way; marks still lists it, from its command line.
-
-**bash** (4.4 or later, for `PS0`):
+**bash** (4.4 or later, for `PS0`), in `.bashrc`:
 
 ```bash
-PROMPT_COMMAND="_ranma_s=\$?${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
-PS1='\[\e]133;D;${_ranma_s}\a\e]133;A\a\]'"$PS1"
 PS0='\e]133;C\a'
+PROMPT_COMMAND='printf "\e]133;D;%s\a\e]133;A\a" "$?"'${PROMPT_COMMAND:+"; $PROMPT_COMMAND"}
 ```
 
-**powerlevel10k with its transient prompt sees nothing.** With the CONFIG.md lines alone, a p10k prompt is drawn over its marks every time, so marks finds none in the pane and says so. That is a ranma bug (card c239, "pane:marks() loses marks when the shell redraws its prompt (empty under p10k)"), and this stays true until ranma fixes it. p10k rebuilds `PS1` before every prompt, so the zsh lines above do not help under it. Turn on p10k's own marks in `~/.p10k.zsh` instead (alongside the CONFIG.md lines is fine):
-
-```zsh
-typeset -g POWERLEVEL9K_TERM_SHELL_INTEGRATION=true
-```
-
-Prompts, command lines and output then come through, but exit statuses do not: p10k sends a command's end before a prompt it then redraws. The list shows `·` for the status, and no durations.
+The same marks make ranma's `command_started` and `command_finished` hooks work. A shell that sends prompts but never says how a command ended still works: each command ends where the next prompt starts, and the list shows `·` for its status.
 
 ## Binds and commands
 
